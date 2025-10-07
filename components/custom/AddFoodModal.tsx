@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Search, CheckCircle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { useMacroStore } from "@/lib/store";
-import { fetchNutritionixData } from "@/app/api/nutrition/usda-api";
-import { Card, CardContent } from "@/components/ui/card"; 
+import { fetchUsdaData } from "@/app/api/nutrition/usda-api"; 
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 interface FoodData {
-    name: string;
+    id: string | number;
+    name: string; 
     calories: number;
     protein: number;
     carbs: number;
@@ -21,7 +22,7 @@ interface FoodData {
     fiber: number;
     sugar: number;
     sodium: number;
-    quantity: number;
+    quantity: number; 
 }
 
 interface AddFoodModalProps {
@@ -41,30 +42,24 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
 
     const handleSearch = async () => {
         if (!query.trim()) {
-            setError("Por favor, ingresa un alimento y cantidad (ej: 100g de arroz).");
+            setError("Por favor, ingresa un alimento y cantidad (ej: manzana, 100g de arroz).");
             return;
         }
 
         setIsLoading(true);
         setError(null);
-        setSearchResults([]); 
+        setSearchResults([]);
 
         try {
-            
-            const foods = await fetchNutritionixData(query);
+            const foods = await fetchUsdaData(query);
 
             if (foods.length > 0) {
-                setSearchResults(
-                    foods.map((food) => ({
-                        ...food,
-                        quantity: food.quantity !== undefined ? food.quantity : 0,
-                    }))
-                );
+                setSearchResults(foods);
             } else {
-                setError(`No se encontraron resultados para "${query}". Intenta ser más específico.`);
+                setError(`No se encontraron resultados para "${query}". Intenta términos más amplios.`);
             }
         } catch (err) {
-            setError("Ocurrió un error al buscar el alimento. Inténtalo de nuevo.");
+            setError("Ocurrió un error al buscar el alimento. Verifica la clave API.");
             console.error(err);
         } finally {
             setIsLoading(false);
@@ -103,12 +98,11 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                 <DialogHeader>
                     <DialogTitle>Agregar Alimento</DialogTitle>
                     <DialogDescription>
-                        Describe el alimento y la cantidad (ej: 200g de pechuga de pollo)
+                        Describe el alimento para buscar (ej: apple, pechuga de pollo)
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-4 py-4">
-                    
                     <div className="space-y-2">
                         <Label htmlFor="meal-type">Añadir a:</Label>
                         <select
@@ -124,13 +118,12 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                         </select>
                     </div>
 
-                    
                     <div className="space-y-2">
-                        <Label htmlFor="query">Búsqueda (Lenguaje Natural)</Label>
+                        <Label htmlFor="query">Búsqueda (Inglés/Español)</Label>
                         <div className="flex space-x-2">
                             <Input
                                 id="query"
-                                placeholder="Ej: 150g de pollo a la plancha"
+                                placeholder="Ej: Salmon, arroz blanco, Chicken Breast"
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 onKeyDown={(e) => {
@@ -150,19 +143,17 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                         </div>
                     </div>
 
-                    
                     {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
-                    
                     
                     {searchResults.length > 0 && (
                         <div className="mt-4 space-y-3">
-                            <h3 className="text-md font-semibold border-b pb-1">Resultados ({searchResults.length})</h3>
+                            <h3 className="text-md font-semibold border-b pb-1">Selecciona un Alimento (Datos por 100g)</h3>
                             {searchResults.map((food, index) => (
                                 <Card key={index} className="border-green-300">
                                     <CardContent className="p-4 flex justify-between items-center">
                                         <div className="flex flex-col">
-                                            <p className="font-bold text-lg">{food.name} <span className="text-sm font-normal text-muted-foreground">({Math.round(food.quantity)}g)</span></p>
-                                            <p className="text-sm text-primary font-medium">{Math.round(food.calories)} cal</p>
+                                            <p className="font-bold text-lg">{food.name}</p>
+                                            <p className="text-sm text-primary font-medium">{Math.round(food.calories)} cal / 100g</p>
                                             <div className="flex space-x-4 text-xs mt-1 text-muted-foreground">
                                                 <span>P: {Math.round(food.protein)}g</span>
                                                 <span>C: {Math.round(food.carbs)}g</span>
