@@ -1,21 +1,45 @@
 "use client"
 
-import { useState, useEffect } from "react" 
+import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useMacroStore } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { Plus, Utensils } from "lucide-react"
-import { AddFoodModal } from "@/components/custom/AddFoodModal"
+import { Plus, Utensils, Edit } from "lucide-react"
+import { AddFoodModal } from "@/components/custom/AddFoodModal" 
+import { EditMealModal } from "@/components/custom/EditMealModal"
+
+interface MealFood {
+  id: number
+  name: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  fiber: number
+  sugar: number
+  sodium: number
+  quantity: number
+}
+
+interface Meal {
+  id: number
+  name: string
+  meal_type: "breakfast" | "lunch" | "dinner" | "snack"
+  foods: MealFood[]
+  date: string
+}
+
 
 export function SeguimientoSection() {
     const { user } = useAuth()
-    const { meals, userGoals, selectedDate, getDailyTotals, getMealsForDate, initializeWithMockData } = useMacroStore()
-
-    const [isModalOpen, setIsModalOpen] = useState(false); 
+    const { meals, userGoals, getDailyTotals, getMealsForDate, initializeWithMockData } = useMacroStore()
 
     const today = new Date().toISOString().split("T")[0]
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+    const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null) 
 
     useEffect(() => {
         if (user && meals.length === 0) {
@@ -32,14 +56,22 @@ export function SeguimientoSection() {
         return Math.max(userGoals.calories - consumed.calories, 0)
     }
 
+    const openEditModal = (meal: Meal) => {
+      setSelectedMeal(meal)
+      setIsEditModalOpen(true)
+    }
+
+    const closeEditModal = () => {
+      setIsEditModalOpen(false)
+      setSelectedMeal(null)
+    }
+
+
     const consumed = getDailyTotals(today)
     const todaysMeals = getMealsForDate(today)
 
-    const openModal = () => setIsModalOpen(true);
-
     return (
         <div className="space-y-6">
-            
             
             <div className="flex items-center justify-between">
                 <div>
@@ -54,15 +86,12 @@ export function SeguimientoSection() {
                         })}
                     </p>
                 </div>
-                
-                <Button onClick={openModal}>
+                <Button onClick={() => setIsAddModalOpen(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar Comida
                 </Button>
             </div>
 
-            
-            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>
                     <CardHeader className="pb-2">
@@ -145,10 +174,15 @@ export function SeguimientoSection() {
                                             <h3 className="font-medium">{meal.name}</h3>
                                             <p className="text-sm text-muted-foreground">{meal.foods.map((food) => food.name).join(", ")}</p>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-right flex items-center space-x-2">
                                             <div className="font-medium">{Math.round(mealCalories)} cal</div>
-                                            <Button variant="ghost" size="sm">
-                                                Editar
+                                            <Button 
+                                              variant="ghost" 
+                                              size="sm" 
+                                              onClick={() => openEditModal(meal)}
+                                              className="p-2 h-8"
+                                            >
+                                                <Edit className="h-4 w-4" />
                                             </Button>
                                         </div>
                                     </div>
@@ -156,11 +190,10 @@ export function SeguimientoSection() {
                             })
                         )}
 
-                        
                         <Button 
                             variant="outline" 
                             className="w-full bg-transparent"
-                            onClick={openModal}
+                            onClick={() => setIsAddModalOpen(true)}
                         >
                             <Plus className="mr-2 h-4 w-4" />
                             Agregar Nueva Comida
@@ -169,11 +202,16 @@ export function SeguimientoSection() {
                 </CardContent>
             </Card>
 
-            
             <AddFoodModal 
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
                 currentDate={today}
+            />
+
+            <EditMealModal
+              isOpen={isEditModalOpen}
+              onClose={closeEditModal}
+              meal={selectedMeal}
             />
         </div>
     )
