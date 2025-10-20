@@ -30,12 +30,12 @@ export default function RegisterPage() {
       return
     }
 
-    const success = await register(name, email, password)
+    const { success, error: registerError } = await register(name, email, password)
 
     if (success) {
-      router.push("/dashboard")
+      router.push("/dashboard") 
     } else {
-      setError("Error al crear la cuenta")
+      setError(registerError || "Error al crear la cuenta. Por favor, verifica tus datos.")
     }
   }
 

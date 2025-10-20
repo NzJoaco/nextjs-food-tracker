@@ -11,7 +11,7 @@ import { AddFoodModal } from "@/components/custom/AddFoodModal"
 import { EditMealModal } from "@/components/custom/EditMealModal"
 
 interface MealFood {
-  id: number
+  id: string | number 
   name: string
   calories: number
   protein: number
@@ -24,7 +24,7 @@ interface MealFood {
 }
 
 interface Meal {
-  id: number
+  id: string
   name: string
   meal_type: "breakfast" | "lunch" | "dinner" | "snack"
   foods: MealFood[]
@@ -34,7 +34,13 @@ interface Meal {
 
 export function SeguimientoSection() {
     const { user } = useAuth()
-    const { meals, userGoals, getDailyTotals, getMealsForDate, initializeWithMockData } = useMacroStore()
+    const { 
+        meals, 
+        userGoals, 
+        getDailyTotals, 
+        getMealsForDate, 
+        loadMeals
+    } = useMacroStore()
 
     const today = new Date().toISOString().split("T")[0]
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -42,10 +48,11 @@ export function SeguimientoSection() {
     const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null) 
 
     useEffect(() => {
-        if (user && meals.length === 0) {
-            initializeWithMockData()
+        if (user && user.id) {
+            loadMeals(user.id)
+        } else if (user === null) {
         }
-    }, [user, meals.length, initializeWithMockData])
+    }, [user, loadMeals])
 
     const getProgressPercentage = (consumed: number, goal: number) => {
         return Math.min((consumed / goal) * 100, 100)
@@ -65,7 +72,6 @@ export function SeguimientoSection() {
       setIsEditModalOpen(false)
       setSelectedMeal(null)
     }
-
 
     const consumed = getDailyTotals(today)
     const todaysMeals = getMealsForDate(today)
@@ -138,7 +144,6 @@ export function SeguimientoSection() {
                 </Card>
             </div>
 
-            
             <Card>
                 <CardContent className="pt-6">
                     <div className="text-center">
@@ -148,7 +153,6 @@ export function SeguimientoSection() {
                 </CardContent>
             </Card>
 
-            
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center">
@@ -160,7 +164,10 @@ export function SeguimientoSection() {
                     <div className="space-y-4">
                         {todaysMeals.length === 0 ? (
                             <p className="text-center text-muted-foreground py-8">
-                                No has registrado comidas para hoy. ¡Comienza agregando tu primera comida!
+                                {!user 
+                                    ? "Inicia sesión para ver y guardar tus comidas."
+                                    : "No has registrado comidas para hoy. ¡Comienza agregando una!"
+                                }
                             </p>
                         ) : (
                             todaysMeals.map((meal) => {
@@ -177,10 +184,10 @@ export function SeguimientoSection() {
                                         <div className="text-right flex items-center space-x-2">
                                             <div className="font-medium">{Math.round(mealCalories)} cal</div>
                                             <Button 
-                                              variant="ghost" 
-                                              size="sm" 
-                                              onClick={() => openEditModal(meal)}
-                                              className="p-2 h-8"
+                                                variant="ghost" 
+                                                size="sm" 
+                                                onClick={() => openEditModal(meal)}
+                                                className="p-2 h-8"
                                             >
                                                 <Edit className="h-4 w-4" />
                                             </Button>
@@ -194,6 +201,7 @@ export function SeguimientoSection() {
                             variant="outline" 
                             className="w-full bg-transparent"
                             onClick={() => setIsAddModalOpen(true)}
+                            disabled={!user}
                         >
                             <Plus className="mr-2 h-4 w-4" />
                             Agregar Nueva Comida
@@ -201,7 +209,6 @@ export function SeguimientoSection() {
                     </div>
                 </CardContent>
             </Card>
-
             <AddFoodModal 
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}

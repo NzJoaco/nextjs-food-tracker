@@ -1,9 +1,10 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import { mockFoods, mockMeals, mockGoals } from "./mock-data"
+import { supabase } from "./supabase"
+import { toast } from "sonner"
 
-interface Food {
-  id: number
+export interface Food {
+  id: string | number
   name: string
   calories: number
   protein: number
@@ -14,19 +15,19 @@ interface Food {
   sodium: number
 }
 
-interface MealFood extends Food {
+export interface MealFood extends Food {
   quantity: number
 }
 
-interface Meal {
-  id: number
+export interface Meal {
+  id: string
   name: string
   meal_type: "breakfast" | "lunch" | "dinner" | "snack"
   foods: MealFood[]
   date: string
 }
 
-interface UserGoals {
+export interface UserGoals {
   calories: number
   protein: number
   carbs: number
@@ -41,14 +42,13 @@ interface MacroStore {
   selectedDate: string
   foods: Food[]
 
-  addMeal: (meal: Omit<Meal, "id">) => void
-  updateMeal: (id: number, meal: Partial<Meal>) => void
-  deleteMeal: (id: number) => void
+  loadMeals: (userId: string) => Promise<void>
+  addMeal: (newMeal: Omit<Meal, "id">, userId: string) => Promise<void>
+  deleteMeal: (mealId: string) => Promise<void>
+  updateMealFood: (mealId: string, foodId: string | number, newQuantity: number) => Promise<void>
+  updateMeal: (id: string, meal: Partial<Meal>) => void
   setUserGoals: (goals: UserGoals) => void
   setSelectedDate: (date: string) => void
-  initializeWithMockData: () => void
-  addFoodToMeal: (date: string, mealType: Meal["meal_type"], foodData: Omit<MealFood, "id">) => void
-  updateMealFood: (mealId: number, foodId: number, newQuantity: number) => void
 
   getDailyTotals: (date: string) => {
     calories: number
@@ -62,7 +62,6 @@ interface MacroStore {
 export const useMacroStore = create<MacroStore>()(
   persist(
     (set, get) => ({
-
       meals: [],
       userGoals: {
         calories: 2000,
@@ -73,110 +72,123 @@ export const useMacroStore = create<MacroStore>()(
         goal: "maintain",
       },
       selectedDate: new Date().toISOString().split("T")[0],
-      foods: mockFoods,
+      foods: [],
 
+      loadMeals: async (userId: string) => {
+        try {
+          const { data, error } = await supabase
+            .from("meals")
+            .select("*")
+            .eq("user_id", userId)
+            .order("date", { ascending: false })
+          if (error) throw error
+          const loadedMeals: Meal[] = data.map((meal) => ({
+              ...meal,
+              id: String(meal.id),
+              meal_type: meal.meal_type as "breakfast" | "lunch" | "dinner" | "snack",
+              foods: meal.foods as MealFood[],
+          }))
 
-      addMeal: (meal) =>
-        set((state) => ({
-          meals: [...state.meals, { ...meal, id: Date.now() }],
-        })),
+          set({ meals: loadedMeals })
+        } catch (error) {
+          console.error("Error cargando comidas:", error)
+          toast.error("No se pudieron cargar tus comidas.")
+        }
+      },
+
+      addMeal: async (newMeal, userId) => {
+        const payload = {
+          user_id: userId,
+          name: newMeal.name,
+          meal_type: newMeal.meal_type,
+          date: newMeal.date,
+          foods: newMeal.foods,
+        }
+
+        try {
+          const { data, error } = await supabase
+            .from("meals")
+            .insert([payload])
+            .select()
+
+          if (error) throw error
+
+          const savedMeal = data[0]
+
+          const mealWithID: Meal = {
+            ...newMeal,
+            id: String(savedMeal.id),
+          }
+
+          set((state) => ({
+            meals: [...state.meals, mealWithID],
+          }))
+          toast.success("Comida guardada exitosamente.")
+
+        } catch (error) {
+          console.error("Error guardando comida:", error)
+          toast.error("Error al guardar la comida.")
+          throw error
+        }
+      },
+
+      deleteMeal: async (mealId) => {
+        try {
+          const { error } = await supabase
+            .from("meals")
+            .delete()
+            .eq("id", mealId)
+          if (error) throw error
+          set((state) => ({
+            meals: state.meals.filter(meal => meal.id !== mealId)
+          }))
+          toast.success("Comida eliminada.")
+        } catch (error) {
+          console.error("Error eliminando comida:", error)
+          toast.error("Error al eliminar la comida.")
+        }
+      },
+      updateMealFood: async (mealId, foodId, newQuantity) => {
+        const meal = get().meals.find(m => m.id === mealId)
+        if (!meal) return
+        const updatedFoods = meal.foods
+          .map(food => {
+            if (food.id === foodId) {
+              return { ...food, quantity: newQuantity }
+            }
+            return food
+          })
+          .filter(food => food.quantity > 0)
+        if (updatedFoods.length === 0) {
+            await get().deleteMeal(mealId)
+            return
+        }
+        try {
+            const { error } = await supabase
+              .from("meals")
+              .update({ foods: updatedFoods })
+              .eq("id", mealId)
+            if (error) throw error
+            set((state) => ({
+                meals: state.meals.map(m =>
+                    m.id === mealId ? { ...m, foods: updatedFoods } : m
+                )
+            }))
+            toast.success("Alimento actualizado.")
+        } catch (error) {
+            console.error("Error actualizando alimento:", error)
+            toast.error("Error al actualizar el alimento.")
+        }
+      },
 
       updateMeal: (id, updatedMeal) =>
         set((state) => ({
           meals: state.meals.map((meal) => (meal.id === id ? { ...meal, ...updatedMeal } : meal)),
         })),
 
-      deleteMeal: (id) =>
-        set((state) => ({
-          meals: state.meals.filter((meal) => meal.id !== id),
-        })),
-
       setUserGoals: (goals) => set({ userGoals: goals }),
 
       setSelectedDate: (date) => set({ selectedDate: date }),
-
-      addFoodToMeal: (date, mealType, foodData) => {
-        set((state) => {
-            const existingMeal = state.meals.find(
-                (m) => m.date === date && m.meal_type === mealType
-            );
-            const newFoodWithId = { ...foodData, id: Date.now() };
-
-            if (existingMeal) {
-                const updatedMeals = state.meals.map((meal) =>
-                    meal.id === existingMeal.id
-                        ? { ...meal, foods: [...meal.foods, newFoodWithId] }
-                        : meal
-                );
-                return { meals: updatedMeals };
-            } else {
-                const newMeal: Meal = {
-                    id: Date.now() + 1,
-                    name: mealType.charAt(0).toUpperCase() + mealType.slice(1),
-                    meal_type: mealType,
-                    date: date,
-                    foods: [newFoodWithId],
-                };
-                return { meals: [...state.meals, newMeal] };
-            }
-        });
-      },
-
-      updateMealFood: (mealId, foodId, newQuantity) => {
-        set((state) => ({
-          meals: state.meals.map((meal) => {
-            if (meal.id === mealId) {
-              const updatedFoods = meal.foods
-                .map((food) => {
-                  if (food.id === foodId) {
-                    return newQuantity > 0 ? { ...food, quantity: newQuantity } : null;
-                  }
-                  return food;
-                })
-                .filter((food): food is MealFood => food !== null);
-
-              if (updatedFoods.length === 0) {
-                return null; 
-              }
-
-              return { ...meal, foods: updatedFoods };
-            }
-            return meal;
-          }).filter((meal): meal is Meal => meal !== null)
-        }));
-      },
-
-      initializeWithMockData: () => {
-        const today = new Date().toISOString().split("T")[0]
-        const mockMealsWithToday = mockMeals.map((meal) => ({
-          id: meal.id,
-          name: meal.name,
-          meal_type: (meal as Meal).meal_type ?? "breakfast",
-          date: today,
-          foods: meal.foods.map((food) => ({
-            id: food.id,
-            name: food.name,
-            calories: food.calories,
-            protein: food.protein,
-            carbs: food.carbs,
-            fat: food.fat,
-            fiber: food.fiber,
-            sugar: food.sugar,
-            sodium: food.sodium,
-            quantity: food.quantity,
-          })),
-        }))
-
-        set({
-          meals: mockMealsWithToday,
-          userGoals: {
-            ...mockGoals,
-            activityLevel: "moderate",
-            goal: "maintain",
-          },
-          foods: mockFoods,
-        })
-      },
 
       getDailyTotals: (date) => {
         const meals = get().getMealsForDate(date)

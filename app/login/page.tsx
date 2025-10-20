@@ -22,13 +22,11 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-
-    const success = await login(email, password)
-
+    const { success, error: loginError } = await login(email, password)
     if (success) {
       router.push("/dashboard")
     } else {
-      setError("Credenciales inválidas")
+      setError(loginError || "Credenciales inválidas. Por favor, inténtalo de nuevo.")
     }
   }
 

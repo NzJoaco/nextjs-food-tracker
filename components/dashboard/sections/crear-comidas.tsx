@@ -9,11 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, X } from "lucide-react"
+import { Plus, Search, X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { fetchUsdaData } from "@/app/api/nutrition/usda-api" 
 
 interface Food {
-  id: number
+  id: string | number
   name: string
   calories: number
   protein: number
@@ -30,35 +31,46 @@ interface SelectedFood extends Food {
 
 export function CrearComidasSection() {
   const { user } = useAuth()
-  const { foods, addMeal } = useMacroStore()
+  const { addMeal } = useMacroStore()
   const [searchTerm, setSearchTerm] = useState("")
   const [searchResults, setSearchResults] = useState<Food[]>([])
   const [selectedFoods, setSelectedFoods] = useState<SelectedFood[]>([])
   const [mealName, setMealName] = useState("")
   const [mealType, setMealType] = useState("")
   const [saving, setSaving] = useState(false)
+  const [searching, setSearching] = useState(false)
 
-  const searchFoods = () => {
+  const searchFoods = async () => {
     if (!searchTerm.trim()) return
 
-    const results = foods.filter((food) => food.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    setSearchResults(results)
+    setSearching(true)
+    setSearchResults([])
+
+    try {
+      const results = await fetchUsdaData(searchTerm)
+      setSearchResults(results)
+    } catch (error) {
+      toast("Error al buscar alimentos en la base de datos.")
+    } finally {
+      setSearching(false)
+    }
   }
 
   const addFood = (food: Food) => {
     const existingFood = selectedFoods.find((f) => f.id === food.id)
     if (existingFood) {
-      setSelectedFoods(selectedFoods.map((f) => (f.id === food.id ? { ...f, quantity: f.quantity + 100 } : f)))
+      toast(`"${food.name}" ya está en tu lista. Edita la cantidad allí.`)
     } else {
       setSelectedFoods([...selectedFoods, { ...food, quantity: 100 }])
+      toast(`Alimento "${food.name}" agregado. Ajusta la cantidad.`)
     }
   }
 
-  const removeFood = (foodId: number) => {
+  const removeFood = (foodId: string | number) => {
     setSelectedFoods(selectedFoods.filter((f) => f.id !== foodId))
   }
 
-  const updateQuantity = (foodId: number, quantity: number) => {
+  const updateQuantity = (foodId: string | number, quantity: number) => {
     if (quantity <= 0) {
       removeFood(foodId)
       return
@@ -80,34 +92,33 @@ export function CrearComidasSection() {
 
   const saveMeal = async () => {
     if (!mealName || !mealType || selectedFoods.length === 0) {
-      toast(
-        "Por favor completa todos los campos y agrega al menos un alimento."
-        )
+      toast("Por favor completa todos los campos y agrega al menos un alimento.")
       return
+    }
+
+    if (!user || !user.id) {
+        toast("Debes iniciar sesión para guardar una comida personalizada.")
+        return
     }
 
     setSaving(true)
     try {
       
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      addMeal({
+      await addMeal({
         name: mealName,
         meal_type: mealType as "breakfast" | "lunch" | "dinner" | "snack",
         date: new Date().toISOString().split("T")[0],
         foods: selectedFoods,
-      })
+      }, user.id)
 
-      toast("Tu comida ha sido registrada exitosamente.")
-
-     
       setMealName("")
       setMealType("")
       setSelectedFoods([])
       setSearchResults([])
       setSearchTerm("")
+      
     } catch (error) {
-      toast("No se pudo guardar la comida. Inténtalo de nuevo.")
+      console.error(error);
     } finally {
       setSaving(false)
     }
@@ -121,11 +132,11 @@ export function CrearComidasSection() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Crear Comida</h1>
-          <p className="text-muted-foreground">Agrega alimentos para crear una nueva comida</p>
+          <p className="text-muted-foreground">Agrega alimentos buscando en la base de datos USDA</p>
         </div>
-        <Button onClick={saveMeal} disabled={selectedFoods.length === 0 || saving}>
+        <Button onClick={saveMeal} disabled={selectedFoods.length === 0 || saving || !user}>
           <Plus className="mr-2 h-4 w-4" />
-          {saving ? "Guardando..." : "Guardar Comida"}
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar Comida"}
         </Button>
       </div>
 
@@ -140,20 +151,27 @@ export function CrearComidasSection() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar alimentos..."
+                  placeholder="Buscar alimentos (ej: apple, arroz)"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && searchFoods()}
                   className="pl-10"
+                  disabled={searching}
                 />
               </div>
-              <Button onClick={searchFoods} disabled={!searchTerm.trim()}>
-                <Search className="h-4 w-4" />
+              <Button onClick={searchFoods} disabled={!searchTerm.trim() || searching}>
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
             </div>
 
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {searchResults.length === 0 && searchTerm && (
+              {searching && (
+                <p className="text-sm text-center text-muted-foreground py-4 flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Buscando resultados...
+                </p>
+              )}
+              {!searching && searchResults.length === 0 && searchTerm && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   No se encontraron alimentos. Intenta con otro término de búsqueda.
                 </p>
@@ -167,7 +185,7 @@ export function CrearComidasSection() {
                   <div>
                     <h4 className="font-medium">{food.name}</h4>
                     <p className="text-sm text-muted-foreground">
-                      {food.calories} cal, {food.protein}g prot - por 100g
+                      {Math.round(food.calories)} cal, {Math.round(food.protein)}g prot - por 100g
                     </p>
                   </div>
                   <Button size="sm" variant="ghost">
@@ -182,7 +200,7 @@ export function CrearComidasSection() {
         
         <Card>
           <CardHeader>
-            <CardTitle>Crear Comida</CardTitle>
+            <CardTitle>Comida a Crear</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -216,7 +234,7 @@ export function CrearComidasSection() {
               {selectedFoods.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No hay alimentos seleccionados</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-60 overflow-y-auto">
                   {selectedFoods.map((food) => (
                     <div key={food.id} className="flex items-center justify-between p-2 border border-border rounded">
                       <div className="flex-1">
@@ -227,7 +245,7 @@ export function CrearComidasSection() {
                           type="number"
                           value={food.quantity}
                           onChange={(e) => updateQuantity(food.id, Number.parseFloat(e.target.value) || 0)}
-                          className="w-16 h-8"
+                          className="w-16 h-8 text-right"
                           min="0"
                           step="1"
                         />

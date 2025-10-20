@@ -8,13 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Search, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMacroStore } from "@/lib/store";
-import { fetchUsdaData } from "@/app/api/nutrition/usda-api"; 
+import { fetchUsdaData } from "@/app/api/nutrition/usda-api";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 interface FoodData {
     id: string | number;
-    name: string; 
+    name: string;
     calories: number;
     protein: number;
     carbs: number;
@@ -22,7 +22,7 @@ interface FoodData {
     fiber: number;
     sugar: number;
     sodium: number;
-    quantity: number; 
+    quantity: number;
 }
 
 interface AddFoodModalProps {
@@ -33,7 +33,6 @@ interface AddFoodModalProps {
 
 export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps) {
     const { addFoodToMeal } = useMacroStore();
-    
     const [query, setQuery] = useState("");
     const [selectedMealType, setSelectedMealType] = useState<MealType>("lunch");
     const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +51,6 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
 
         try {
             const foods = await fetchUsdaData(query);
-
             if (foods.length > 0) {
                 setSearchResults(foods);
             } else {
@@ -78,7 +76,7 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
             sodium: foodData.sodium,
             quantity: foodData.quantity,
         });
-        
+
         setQuery("");
         setSearchResults([]);
         onClose();
@@ -105,7 +103,9 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                 <div className="grid gap-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="meal-type">Añadir a:</Label>
+
                         <select
+
                             id="meal-type"
                             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                             value={selectedMealType}
@@ -133,6 +133,7 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                                 }}
                                 disabled={isLoading}
                             />
+
                             <Button onClick={handleSearch} disabled={isLoading} variant="secondary">
                                 {isLoading ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -144,7 +145,6 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                     </div>
 
                     {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
-                    
                     {searchResults.length > 0 && (
                         <div className="mt-4 space-y-3">
                             <h3 className="text-md font-semibold border-b pb-1">Selecciona un Alimento (Datos por 100g)</h3>
@@ -160,9 +160,9 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                                                 <span>G: {Math.round(food.fat)}g</span>
                                             </div>
                                         </div>
-                                        <Button 
-                                            onClick={() => handleSelectAndAdd(food)} 
-                                            variant="default" 
+                                        <Button
+                                            onClick={() => handleSelectAndAdd(food)}
+                                            variant="default"
                                             size="sm"
                                         >
                                             <CheckCircle className="h-4 w-4 mr-1"/> Añadir
