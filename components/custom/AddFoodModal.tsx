@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Search, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useMacroStore } from "@/lib/store";
+import { useMacroStore, type MealFood } from "@/lib/store";
 import { fetchUsdaData } from "@/app/api/nutrition/usda-api";
+import { useAuth } from "@/lib/auth-context";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -32,7 +33,8 @@ interface AddFoodModalProps {
 }
 
 export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps) {
-    const { addFoodToMeal } = useMacroStore();
+    const { addFoodToMeal, meals } = useMacroStore();
+    const { user } = useAuth();
     const [query, setQuery] = useState("");
     const [selectedMealType, setSelectedMealType] = useState<MealType>("lunch");
     const [isLoading, setIsLoading] = useState(false);
@@ -64,18 +66,17 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
         }
     };
 
-    const handleSelectAndAdd = (foodData: FoodData) => {
-        addFoodToMeal(currentDate, selectedMealType, {
-            name: foodData.name,
-            calories: foodData.calories,
-            protein: foodData.protein,
-            carbs: foodData.carbs,
-            fat: foodData.fat,
-            fiber: foodData.fiber,
-            sugar: foodData.sugar,
-            sodium: foodData.sodium,
-            quantity: foodData.quantity,
-        });
+    const handleSelectAndAdd = async (foodData: FoodData) => {
+        if (!user) {
+            setError("Debes iniciar sesión para agregar alimentos.");
+            return;
+        }
+
+        const newMealFood: MealFood = {
+            ...foodData
+        };
+
+        await addFoodToMeal(user.id, currentDate, selectedMealType, newMealFood);
 
         setQuery("");
         setSearchResults([]);

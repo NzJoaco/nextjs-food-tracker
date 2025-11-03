@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { useMacroStore } from "@/lib/store"
 import { useRouter } from "next/navigation"
 import { DashboardNavbar } from "@/components/dashboard/navbar"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
@@ -12,14 +13,17 @@ import { CalendarioSection } from "@/components/dashboard/sections/calendario"
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth()
+  const { loadMeals } = useMacroStore();
   const [activeSection, setActiveSection] = useState("seguimiento")
   const router = useRouter()
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/login")
+    } else if (user) {
+      loadMeals(user.id);
     }
-  }, [user, isLoading, router])
+  }, [user, isLoading, router, loadMeals])
 
   if (isLoading) {
     return (

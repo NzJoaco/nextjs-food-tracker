@@ -17,7 +17,7 @@ interface EditMealModalProps {
 }
 
 export function EditMealModal({ isOpen, onClose, meal }: EditMealModalProps) {
-  const { updateMealFood, deleteMeal } = useMacroStore()
+  const { updateMealFoods, deleteMeal } = useMacroStore()
   const [foods, setFoods] = useState<MealFood[]>(meal?.foods || [])
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -48,9 +48,7 @@ export function EditMealModal({ isOpen, onClose, meal }: EditMealModalProps) {
     setIsSaving(true)
     
     try {
-      for (const updatedFood of foods) {
-        await updateMealFood(meal.id, updatedFood.id, updatedFood.quantity);
-      }
+      await updateMealFoods(meal.id, foods)
       
       onClose()
       
