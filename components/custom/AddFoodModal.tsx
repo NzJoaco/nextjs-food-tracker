@@ -5,11 +5,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, CheckCircle } from "lucide-react";
+import { Loader2, Search, CheckCircle, PlusCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useMacroStore, type MealFood } from "@/lib/store";
+import { useMacroStore, type MealFood, type Meal } from "@/lib/store";
 import { fetchUsdaData } from "@/app/api/nutrition/usda-api";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
+
+interface CustomMeal {
+  id: string;
+  name: string;
+  meal_type: MealType;
+  foods: MealFood[];
+}
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
@@ -33,13 +42,41 @@ interface AddFoodModalProps {
 }
 
 export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps) {
-    const { addFoodToMeal, meals } = useMacroStore();
+    const { addCustomMealToLog } = useMacroStore();
     const { user } = useAuth();
     const [query, setQuery] = useState("");
     const [selectedMealType, setSelectedMealType] = useState<MealType>("lunch");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [searchResults, setSearchResults] = useState<FoodData[]>([]);
+    const [customMeals, setCustomMeals] = useState<CustomMeal[]>([]);
+    const [loadingCustomMeals, setLoadingCustomMeals] = useState(false);
+
+    useEffect(() => {
+        const fetchCustomMeals = async () => {
+            if (user && isOpen) {
+                setLoadingCustomMeals(true);
+                const { data, error } = await supabase
+                    .from('custom_meals')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('meal_type', selectedMealType);
+
+                if (error) {
+                    toast.error("No se pudieron cargar tus comidas personalizadas.");
+                } else if (data) {
+                    const parsedData = data.map(meal => ({
+                        ...meal,
+                        foods: typeof meal.foods === 'string' ? JSON.parse(meal.foods) : meal.foods,
+                    }));
+                    setCustomMeals(parsedData);
+                }
+                setLoadingCustomMeals(false);
+            }
+        };
+        fetchCustomMeals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, isOpen, selectedMealType]);
 
     const handleSearch = async () => {
         if (!query.trim()) {
@@ -66,30 +103,28 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
         }
     };
 
-    const handleSelectAndAdd = async (foodData: FoodData) => {
+    const handleAddCustomMeal = async (customMeal: CustomMeal) => {
         if (!user) {
-            setError("Debes iniciar sesión para agregar alimentos.");
+            toast.error("Debes iniciar sesión para agregar comidas.");
             return;
         }
+        
+        await addCustomMealToLog(user.id, currentDate, customMeal);
 
-        const newMealFood: MealFood = {
-            ...foodData
-        };
-
-        await addFoodToMeal(user.id, currentDate, selectedMealType, newMealFood);
-
-        setQuery("");
-        setSearchResults([]);
-        onClose();
+        toast.success(`"${customMeal.name}" agregada a tu día.`);
+        handleClose();
     };
 
     const handleClose = () => {
         setQuery("");
         setSearchResults([]);
+        setCustomMeals([]);
         setError(null);
         setIsLoading(false);
         onClose();
     };
+
+    const filteredCustomMeals = customMeals;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -97,7 +132,7 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                 <DialogHeader>
                     <DialogTitle>Agregar Alimento</DialogTitle>
                     <DialogDescription>
-                        Describe el alimento para buscar (ej: apple, pechuga de pollo)
+                        Busca en la base de datos de USDA o selecciona una de tus comidas personalizadas.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -145,10 +180,45 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                         </div>
                     </div>
 
+                    <div className="mt-6 space-y-3">
+                        <h3 className="text-md font-semibold border-b pb-1">Mis Comidas de {
+                            { breakfast: "Desayuno", lunch: "Almuerzo", dinner: "Cena", snack: "Snack" }[selectedMealType]
+                        }</h3>
+                        {loadingCustomMeals && <p className="text-sm text-muted-foreground text-center py-4 flex items-center justify-center"><Loader2 className="h-4 w-4 mr-2 animate-spin"/>Cargando tus comidas...</p>}
+                        {!loadingCustomMeals && filteredCustomMeals.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                                No tienes comidas personalizadas para este tipo. ¡Crea una en la sección Crear Comidas!
+                            </p>
+                        )}
+                        {filteredCustomMeals.map((meal) => {
+                            const totalCalories = meal.foods.reduce((sum, food) => sum + food.calories * (food.quantity / 100), 0);
+                            return (
+                                <Card key={meal.id} className="border-blue-300">
+                                    <CardContent className="p-4 flex justify-between items-center">
+                                        <div className="flex flex-col">
+                                            <p className="font-bold text-lg">{meal.name}</p>
+                                            <p className="text-sm text-primary font-medium">{Math.round(totalCalories)} cal</p>
+                                            <p className="text-xs mt-1 text-muted-foreground truncate max-w-[200px]">
+                                                {meal.foods.map(f => f.name).join(', ')}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            onClick={() => handleAddCustomMeal(meal)}
+                                            variant="secondary"
+                                            size="sm"
+                                        >
+                                            <PlusCircle className="h-4 w-4 mr-1"/> Añadir
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+
                     {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
                     {searchResults.length > 0 && (
                         <div className="mt-4 space-y-3">
-                            <h3 className="text-md font-semibold border-b pb-1">Selecciona un Alimento (Datos por 100g)</h3>
+                            <h3 className="text-md font-semibold border-b pb-1">Resultados de la Búsqueda (USDA)</h3>
                             {searchResults.map((food, index) => (
                                 <Card key={index} className="border-green-300">
                                     <CardContent className="p-4 flex justify-between items-center">
@@ -162,7 +232,7 @@ export function AddFoodModal({ isOpen, onClose, currentDate }: AddFoodModalProps
                                             </div>
                                         </div>
                                         <Button
-                                            onClick={() => handleSelectAndAdd(food)}
+                                            onClick={() => alert("Funcionalidad para agregar alimento individual pendiente.")}
                                             variant="default"
                                             size="sm"
                                         >

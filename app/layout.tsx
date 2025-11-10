@@ -16,7 +16,6 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "MacroTracker - Contador de Macros",
   description: "Aplicación para contar macronutrientes diarios",
-  generator: "v0.app",
 }
 
 export default function RootLayout({

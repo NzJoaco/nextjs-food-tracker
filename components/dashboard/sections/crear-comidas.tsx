@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { useMacroStore } from "@/lib/store"
+import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Plus, Search, X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { fetchUsdaData } from "@/app/api/nutrition/usda-api" 
+import { fetchUsdaData } from "@/app/api/nutrition/usda-api"
 
 interface Food {
   id: string | number
@@ -31,7 +31,6 @@ interface SelectedFood extends Food {
 
 export function CrearComidasSection() {
   const { user } = useAuth()
-  const { addMeal } = useMacroStore()
   const [searchTerm, setSearchTerm] = useState("")
   const [searchResults, setSearchResults] = useState<Food[]>([])
   const [selectedFoods, setSelectedFoods] = useState<SelectedFood[]>([])
@@ -44,7 +43,6 @@ export function CrearComidasSection() {
     if (!searchTerm.trim()) return
 
     setSearching(true)
-    setSearchResults([])
 
     try {
       const results = await fetchUsdaData(searchTerm)
@@ -103,22 +101,27 @@ export function CrearComidasSection() {
 
     setSaving(true)
     try {
-      
-      await addMeal({
-        name: mealName,
-        meal_type: mealType as "breakfast" | "lunch" | "dinner" | "snack",
-        date: new Date().toISOString().split("T")[0],
-        foods: selectedFoods,
-      }, user.id)
+      const { error } = await supabase
+        .from("custom_meals")
+        .insert([{ 
+          user_id: user.id,
+          name: mealName,
+          meal_type: mealType,
+          foods: selectedFoods,
+        }])
+
+      if (error) throw error
 
       setMealName("")
       setMealType("")
       setSelectedFoods([])
       setSearchResults([])
       setSearchTerm("")
-      
+      toast.success("Comida personalizada guardada exitosamente.")
+
     } catch (error) {
-      console.error(error);
+      console.error("Error guardando comida personalizada:", error);
+      toast.error("Error al guardar la comida personalizada.")
     } finally {
       setSaving(false)
     }
@@ -128,20 +131,20 @@ export function CrearComidasSection() {
 
   return (
     <div className="space-y-6">
-      
+
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Crear Comida</h1>
-          <p className="text-muted-foreground">Agrega alimentos buscando en la base de datos USDA</p>
+          <h1 className="text-3xl font-bold">Crear Comida Personalizada</h1>
+          <p className="text-muted-foreground">Crea plantillas de comidas que podrás agregar rápidamente a tu seguimiento diario.</p>
         </div>
         <Button onClick={saveMeal} disabled={selectedFoods.length === 0 || saving || !user}>
           <Plus className="mr-2 h-4 w-4" />
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar Comida"}
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar Comida Personalizada"}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Buscar Alimentos</CardTitle>
@@ -167,8 +170,8 @@ export function CrearComidasSection() {
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {searching && (
                 <p className="text-sm text-center text-muted-foreground py-4 flex items-center justify-center">
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Buscando resultados...
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Buscando resultados...
                 </p>
               )}
               {!searching && searchResults.length === 0 && searchTerm && (
@@ -197,10 +200,10 @@ export function CrearComidasSection() {
           </CardContent>
         </Card>
 
-        
+
         <Card>
           <CardHeader>
-            <CardTitle>Comida a Crear</CardTitle>
+            <CardTitle>Detalles de la Comida</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -228,7 +231,7 @@ export function CrearComidasSection() {
               </Select>
             </div>
 
-            
+
             <div className="space-y-3">
               <Label>Alimentos Seleccionados</Label>
               {selectedFoods.length === 0 ? (
@@ -260,7 +263,7 @@ export function CrearComidasSection() {
               )}
             </div>
 
-            
+
             {selectedFoods.length > 0 && (
               <div className="pt-4 border-t space-y-2">
                 <h4 className="font-medium">Totales</h4>
