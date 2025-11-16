@@ -1,36 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@/lib/auth-context"
-import { useMacroStore } from "@/lib/store"
+import { useAuth } from "@/lib/auth-context" 
+import { useMacroStore, type Meal } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { Plus, Utensils, Edit } from "lucide-react"
 import { AddFoodModal } from "@/components/custom/AddFoodModal" 
 import { EditMealModal } from "@/components/custom/EditMealModal"
-
-interface MealFood {
-  id: string | number 
-  name: string
-  calories: number
-  protein: number
-  carbs: number
-  fat: number
-  fiber: number
-  sugar: number
-  sodium: number
-  quantity: number
-}
-
-interface Meal {
-  id: string
-  name: string
-  meal_type: "breakfast" | "lunch" | "dinner" | "snack"
-  foods: MealFood[]
-  date: string
-}
-
 
 export function SeguimientoSection() {
     const { user } = useAuth()
