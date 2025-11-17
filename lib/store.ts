@@ -74,7 +74,13 @@ export const useMacroStore = create<MacroState>((set, get) => ({
         .eq('user_id', userId);
 
       if (error) throw error;
-      set({ meals: data || [] });
+      const loadedMeals: Meal[] = (data || []).map(meal => ({
+        ...meal,
+        id: String(meal.id),
+        foods: Array.isArray(meal.foods) ? meal.foods : [],
+      }));
+
+      set({ meals: loadedMeals });
     } catch (error) {
       toast.error("No se pudieron cargar las comidas.");
     } finally {
